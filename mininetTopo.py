@@ -16,29 +16,28 @@ from mininet.node import RemoteController
 net = None
 
 class TreeTopo(Topo):
-			
-	def __init__(self):
-		# Initialize topology
-		Topo.__init__(self)
-        
+
+    def __init__(self):
+# Initialize topology
+        Topo.__init__(self)
+
         file = open('topology.in')
 
         [numHost, numSwitch, numLinks] = [int(x) for x in file.readline().split(' ')]
+        
+        # Add hosts
+        for i in range(numHost):
+            self.addHost('h%d' % (i+1))
 
-        # for i in range(numHost):
-        # self.addHost('h%d' % (1))
-	
-	# You can write other functions as you need.
+        # Add switches
+        for i in range(numSwitch):
+            sconfig = {'dpid': "%016x" % (i+1)}
+            self.addSwitch('s%d' % (i+1), **sconfig)
 
-	# Add hosts
-    # > self.addHost('h%d' % [HOST NUMBER])
-
-	# Add switches
-    # > sconfig = {'dpid': "%016x" % [SWITCH NUMBER]}
-    # > self.addSwitch('s%d' % [SWITCH NUMBER], **sconfig)
-
-	# Add links
-	# > self.addLink([HOST1], [HOST2])
+        # Add links
+        for line in file:
+            [node1, node2, bw] = line.split(',')
+            self.addLink(node1, node2, int(bw))
 
 def startNetwork():
     info('** Creating the tree network\n')
@@ -46,8 +45,8 @@ def startNetwork():
 
     global net
     net = Mininet(topo=topo, link = Link,
-                  controller=lambda name: RemoteController(name, ip='192.168.56.1'),
-                  listenPort=6633, autoSetMacs=True)
+            controller=lambda name: RemoteController(name, ip='192.168.56.1'),
+            listenPort=6633, autoSetMacs=True)
 
     info('** Starting the network\n')
     net.start()
@@ -65,9 +64,9 @@ def startNetwork():
 def stopNetwork():
     if net is not None:
         net.stop()
-        # Remove QoS and Queues
-        os.system('sudo ovs-vsctl --all destroy Qos')
-        os.system('sudo ovs-vsctl --all destroy Queue')
+    # Remove QoS and Queues
+    os.system('sudo ovs-vsctl --all destroy Qos')
+    os.system('sudo ovs-vsctl --all destroy Queue')
 
 
 if __name__ == '__main__':
