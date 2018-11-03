@@ -19,7 +19,14 @@ class TreeTopo(Topo):
 			
 	def __init__(self):
 		# Initialize topology
-		Topo.__init__(self)        
+		Topo.__init__(self)
+        
+        file = open('topology.in')
+
+        [numHost, numSwitch, numLinks] = [int(x) for x in file.readline().split(' ')]
+
+        # for i in range(numHost):
+        # self.addHost('h%d' % (1))
 	
 	# You can write other functions as you need.
 
@@ -39,7 +46,7 @@ def startNetwork():
 
     global net
     net = Mininet(topo=topo, link = Link,
-                  controller=lambda name: RemoteController(name, ip='SERVER IP'),
+                  controller=lambda name: RemoteController(name, ip='192.168.56.1'),
                   listenPort=6633, autoSetMacs=True)
 
     info('** Starting the network\n')
