@@ -1,6 +1,6 @@
 '''
-Please add your name:
-Please add your matric number: 
+Please add your name: Yap Han Chiang
+Please add your matric number: A0125168E
 '''
 
 import os
@@ -18,7 +18,7 @@ net = None
 class TreeTopo(Topo):
 
     def __init__(self):
-# Initialize topology
+        # Initialize topology
         Topo.__init__(self)
 
         file = open('topology.in')
@@ -38,6 +38,8 @@ class TreeTopo(Topo):
         for line in file:
             [node1, node2, bw] = line.split(',')
             self.addLink(node1, node2, int(bw))
+        
+        file.close()
 
 def startNetwork():
     info('** Creating the tree network\n')
@@ -51,7 +53,7 @@ def startNetwork():
     info('** Starting the network\n')
     net.start()
 
-    # Create QoS Queues
+    #  Create QoS Queues
     # > os.system('sudo ovs-vsctl -- set Port [INTERFACE] qos=@newqos \
     #            -- --id=@newqos create QoS type=linux-htb other-config:max-rate=[LINK SPEED] queues=0=@q0,1=@q1,2=@q2 \
     #            -- --id=@q0 create queue other-config:max-rate=[LINK SPEED] other-config:min-rate=[LINK SPEED] \

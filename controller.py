@@ -51,7 +51,7 @@ class Controller(EventMixin):
         
         # Send the firewall policies to the switch
         def sendFirewallPolicy(connection, policy):
-            passs
+            pass
             
 
         # for i in [FIREWALL POLICIES]:
