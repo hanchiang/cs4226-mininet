@@ -24,6 +24,16 @@ IDLE_TIMEOUT = 5
 HARD_TIMEOUT = 10
 
 FIREWALL_PRIORITY = 100
+QUEUE_PRIORITY = 50
+
+# As defined in mininetTopo.py
+PREMIUM_TIER = 1
+REGULAR_TIER = 0
+FREE_TIER = 2
+
+# As defined in policy.in
+PREMIUM_CLASS = 1
+REGULAR_CLASS = 0
 
 class Controller(EventMixin):
     def __init__(self):
@@ -45,33 +55,59 @@ class Controller(EventMixin):
         ofp = event.ofp
 
         src = packet.src
-        dst = packet.dst
+        dest = packet.dst
 
         # install entries to the route table
-        def install_enqueue(outport, q_id):
-            log.debug("Switch %s: Installing flow %s.%i -> %s.%i", dpid, src, inport, dst, outport)
+        def install_enqueue(outport, qid):
+            log.debug("Switch %s: Installing flow %s.%i -> %s.%i", dpid, src, inport, dest, outport)
             msg = of.ofp_flow_mod()
+            msg.priority = QUEUE_PRIORITY
             msg.match = of.ofp_match.from_packet(packet, inport)
             msg.idle_timeout = IDLE_TIMEOUT
             msg.hard_timeout = HARD_TIMEOUT
-            msg.actions.append(of.ofp_action_output(port = outport))
+            msg.actions.append(of.ofp_action_enqueue(port = outport, queue_id = qid))
             msg.data = ofp
             event.connection.send(msg)
             log.debug('Switch %s: Data sent to port %s', dpid, outport)
 
         # Check the packet and decide how to route the packet
         def forward(message=None):
-            log.debug("packet: %s, dpid: %s, src: %s, dst: %s, port: %s" % (packet, dpid, src, dst, inport))
+            log.debug("packet: %s, dpid: %s, src: %s, dst: %s, port: %s" % (packet, dpid, src, dest, inport))
             if (src not in self.macToPort[dpid]):
                 self.macToPort[dpid][src] = inport
 
-            if dst.is_multicast:
-                flood('Switch %s: multicast flood to port %s' % (dpid, dst))
-            elif dst not in self.macToPort[dpid]:
-                flood('Switch: %s, port for %s unknown -- flooding' % (dpid, dst))
+            if dest.is_multicast:
+                flood('Switch %s: multicast flood to port %s' % (dpid, dest))
+            elif dest not in self.macToPort[dpid]:
+                flood('Switch: %s, port for %s unknown -- flooding' % (dpid, dest))
             else:
-                outport = self.macToPort[dpid][dst]
-                install_enqueue(outport, 'random q') 
+                outport = self.macToPort[dpid][dest]
+                
+                srcIP = None
+                destIP = None
+                if (packet.type == packet.IP_TYPE):
+                    srcIP = packet.payload.srcip
+                    destIP = packet.payload.dstip
+                elif (packet.type == packet.ARP_TYPE):
+                    srcIP = packet.payload.protosrc
+                    destIP = packet.payload.protodst
+
+                # Determine qid to add flow entry table to
+                log.debug(type(srcIP))
+                qid = FREE_TIER
+                if (srcIP == None):
+                    # Do nothing
+                    pass
+                elif (self.premiumPlans[dpid].get(str(srcIP), None) == None):
+                    # Do nothing
+                    pass
+                elif (self.premiumPlans[dpid][str(srcIP)] == PREMIUM_CLASS):
+                    qid = PREMIUM_TIER
+                elif (self.premiumPlans[dpid][str(srcIP)] == REGULAR_CLASS):
+                    qid = REGULAR_TIER 
+
+
+                install_enqueue(outport, qid) 
 
         # When it knows nothing about the destination, flood but don't install the rule
         def flood(message=None):
@@ -115,12 +151,13 @@ class Controller(EventMixin):
             msg.priority = FIREWALL_PRIORITY
             if (toHost and toPort):
                 msg.match.nw_dst = toHost
-                msg.match.tp_dst = toPort
+                msg.match.tp_dst = int(toPort)
                 if (fromHost):
                     msg.match.nw_src = fromHost
             elif (fromHost and not toHost and not toPort):
                 msg.match.nw_src = fromHost
 
+            connection.send(msg)
             log.debug('Switch %s: Firewall rule for source host %s, dest host %s, dest port %s', dpid, fromHost, toHost, toPort)
 
 
