@@ -35,11 +35,57 @@ class TreeTopo(Topo):
             self.addSwitch('s%d' % (i+1), **sconfig)
 
         # Add links
+        # store link bandwidth, because there is no other way to retrieve it!
+        self.linkInfo = []
         for line in file:
             [node1, node2, bw] = line.split(',')
             self.addLink(node1, node2, int(bw))
+            self.linkInfo.append(line)
         
         file.close()
+
+# in bps
+def getLinkSpeed(topo, node1, node2):
+    for linkInfo in topo.linkInfo:
+        [linkNode1, linkNode2, bw] = linkInfo.split(',')
+        if (node1 == linkNode1 and node2 == linkNode2):
+            # bw is in mbps
+            return int(bw) * 1000000
+    return 0
+
+def createQoS(topo):
+    print('Creating QoS...')
+    for link in topo.links(True, False, True):
+        [node1, node2, linkInfo] = link
+        # linkInfo: A dict with keys node1, node2, port1, port2
+        # print('node 1: %s, node 2: %s, linkinfo: %s' % (node1, node2, linkInfo))
+        for switch in topo.switches():
+            for i in [1, 2]:
+                if (linkInfo['node%i' % i] == switch):
+                    port = linkInfo['port%i' % i]
+                    bw = getLinkSpeed(topo, node1, node2)
+                    # W = premium tier lower bound guarantee
+                    # Y = regular tier lower bound guarantee
+                    # X = regular tier upper bound
+                    # Z = free tier upper bound
+                    W = 0.8 * bw
+                    X = 0.6 * bw
+                    Y = 0.3 * bw
+                    Z = 0.2 * bw
+
+                    #  Create QoS Queues
+                    # Interface name is <switch>-eth<port>
+                    # q0 = regular tier
+                    # q1 = premium tier
+                    # q2 = free tier
+                    interface = '%s-eth%s' % (switch, port)
+                    os.system('sudo ovs-vsctl -- set Port %s qos=@newqos \
+                        -- --id=@newqos create QoS type=linux-htb other-config:max-rate=%i queues=0=@q0,1=@q1,2=@q2 \
+                        -- --id=@q0 create queue other-config:max-rate=%i other-config:min-rate=%i \
+                        -- --id=@q1 create queue other-config:min-rate=%i \
+                        -- --id=@q2 create queue other-config:max-rate=%i' % (interface, bw, X, Y, W, Z))
+    print('QoS created!')
+
 
 def startNetwork():
     info('** Creating the tree network\n')
@@ -52,13 +98,9 @@ def startNetwork():
 
     info('** Starting the network\n')
     net.start()
+    
+    createQoS(topo)
 
-    #  Create QoS Queues
-    # > os.system('sudo ovs-vsctl -- set Port [INTERFACE] qos=@newqos \
-    #            -- --id=@newqos create QoS type=linux-htb other-config:max-rate=[LINK SPEED] queues=0=@q0,1=@q1,2=@q2 \
-    #            -- --id=@q0 create queue other-config:max-rate=[LINK SPEED] other-config:min-rate=[LINK SPEED] \
-    #            -- --id=@q1 create queue other-config:min-rate=[X] \
-    #            -- --id=@q2 create queue other-config:max-rate=[Y]')
 
     info('** Running CLI\n')
     CLI(net)
