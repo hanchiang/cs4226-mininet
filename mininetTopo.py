@@ -21,7 +21,7 @@ class TreeTopo(Topo):
         # Initialize topology
         Topo.__init__(self)
 
-        file = open('topology_updated.in')
+        file = open('topology.in')
 
         [numHost, numSwitch, numLinks] = [int(x) for x in file.readline().split(' ')]
         
