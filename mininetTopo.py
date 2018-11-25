@@ -21,7 +21,7 @@ class TreeTopo(Topo):
         # Initialize topology
         Topo.__init__(self)
 
-        file = open('topology.in')
+        file = open('topology_updated.in')
 
         [numHost, numSwitch, numLinks] = [int(x) for x in file.readline().split(' ')]
         
@@ -38,9 +38,10 @@ class TreeTopo(Topo):
         # store link bandwidth, because there is no other way to retrieve it!
         self.linkInfo = []
         for line in file:
-            [node1, node2, bw] = line.split(',')
-            self.addLink(node1, node2, int(bw))
-            self.linkInfo.append(line)
+            if (not line.isspace()):
+                [node1, node2, bw] = line.split(',')
+                self.addLink(node1, node2, int(bw))
+                self.linkInfo.append(line)
         
         file.close()
 
